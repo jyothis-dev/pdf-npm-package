@@ -50,3 +50,8 @@ export interface GeneratePDFOptions {
   /** Data object with key-value pairs for field values */
   data: PDFData;
 }
+
+/**
+ * A PDF in memory: Uint8Array, ArrayBuffer or a Node.js Buffer
+ */
+export type PDFInput = Uint8Array | ArrayBuffer;

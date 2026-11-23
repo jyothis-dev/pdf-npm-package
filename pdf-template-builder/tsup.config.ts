@@ -7,7 +7,7 @@ export default defineConfig({
   splitting: false,
   sourcemap: true,
   clean: true,
-  treeshake: true,
+  treeshake: false, // rollup treeshake strips the "use client" banner
   minify: false,
   external: ['react', 'react-dom'],
   banner: {

@@ -48,6 +48,9 @@ export async function generatePDF(options: GeneratePDFOptions): Promise<void> {
   await savePdf(pdfDoc, outputPath);
 }
 
+// In-memory API (works in browsers, serverless and Node.js)
+export { fillPdf } from './core/fillPdf.js';
+
 // Export types for consumers
-export type { PDFField, PDFData, GeneratePDFOptions } from './types.js';
+export type { PDFField, PDFData, PDFInput, GeneratePDFOptions } from './types.js';
 

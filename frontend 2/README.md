@@ -1,197 +1,160 @@
-# PDF Template Engine
+# @jyothiswarup/pdf-template-engine
 
-A production-ready, TypeScript-based npm package for filling text fields in PDF templates using x/y coordinates. Built for Node.js with no browser dependencies.
+**Fill any existing PDF from JSON.** Place text at exact positions on certificates, invoices, tickets and forms. Works in **Node.js, the browser, and serverless / edge** runtimes.
 
-## Features
+[![npm](https://img.shields.io/npm/v/@jyothiswarup/pdf-template-engine.svg)](https://www.npmjs.com/package/@jyothiswarup/pdf-template-engine)
+[![license](https://img.shields.io/npm/l/@jyothiswarup/pdf-template-engine.svg)](https://github.com/jyothis-dev/pdf-npm-package/blob/main/LICENSE)
 
-- ✅ Load existing PDF files
-- ✅ Fill dynamic text fields using precise x/y coordinates
-- ✅ Support for multiple pages
-- ✅ Customizable font sizes
-- ✅ Type-safe with TypeScript
-- ✅ Clear error messages
-- ✅ Zero browser dependencies
+**[▶ Try the live demo](https://jyothis-dev.github.io/pdf-npm-package/)**: drag fields onto a PDF and generate it in your browser.
 
-## Installation
+![Placing fields on a certificate template](https://raw.githubusercontent.com/jyothis-dev/pdf-npm-package/main/docs/builder-screenshot.png)
+
+Don't want to work out coordinates by hand? Use the companion visual editor, [`@jyothiswarup/pdf-template-builder`](https://www.npmjs.com/package/@jyothiswarup/pdf-template-builder). Drop it into a React app, drag boxes onto your PDF, and export the schema this package consumes.
+
+## Why
+
+- **Use the PDF you already have.** Design it in Canva, Figma, Word or InDesign, then fill it. There's no template language to learn.
+- **Runs anywhere.** `fillPdf()` works on raw bytes with no file-system access, so it runs in browsers, Vercel and Netlify functions, Cloudflare Workers and Node.js.
+- **Accurate placement.** Text lands inside the box you drew, on rotated pages and pages with crop boxes too.
+- **Small and typed.** Its only dependency is [pdf-lib](https://pdf-lib.js.org), and it ships TypeScript types.
+
+## Install
 
 ```bash
-npm install @your-scope/pdf-template-engine
+npm install @jyothiswarup/pdf-template-engine
 ```
 
-## Requirements
+## Quick start
 
-- Node.js >= 16
-- TypeScript (for TypeScript projects)
+### Browser, serverless or Node.js: `fillPdf()`
 
-## Usage
+```ts
+import { fillPdf } from '@jyothiswarup/pdf-template-engine';
 
-### Basic Example
+const fields = [
+  { key: 'studentName', x: 231, y: 228, width: 380, height: 32, fontSize: 24 },
+  { key: 'issuedOn',    x: 110, y: 444, width: 190, height: 24, fontSize: 13 },
+];
 
-```typescript
-import { generatePDF } from '@your-scope/pdf-template-engine';
+const template = await fetch('/certificate.pdf').then((r) => r.arrayBuffer());
+const pdfBytes = await fillPdf(template, fields, {
+  studentName: 'Ada Lovelace',
+  issuedOn: '23 Nov 2026',
+});
+
+// e.g. show or download it in the browser
+const url = URL.createObjectURL(new Blob([pdfBytes as BlobPart], { type: 'application/pdf' }));
+```
+
+### Node.js, from and to files: `generatePDF()`
+
+```ts
+import { generatePDF } from '@jyothiswarup/pdf-template-engine';
 
 await generatePDF({
-  templatePath: './templates/invoice.pdf',
-  outputPath: './output/invoice-filled.pdf',
-  fields: [
-    { key: 'customerName', x: 100, y: 700, fontSize: 14 },
-    { key: 'invoiceNumber', x: 100, y: 650, fontSize: 12 },
-    { key: 'amount', x: 100, y: 600, fontSize: 16 }
-  ],
-  data: {
-    customerName: 'John Doe',
-    invoiceNumber: 'INV-2024-001',
-    amount: '$1,234.56'
-  }
+  templatePath: './templates/certificate.pdf',
+  outputPath: './output/ada.pdf',
+  fields,
+  data: { studentName: 'Ada Lovelace', issuedOn: '23 Nov 2026' },
 });
 ```
 
-### Multi-page Example
+CommonJS works too: `const { generatePDF, fillPdf } = require('@jyothiswarup/pdf-template-engine')`.
 
-```typescript
-import { generatePDF } from '@your-scope/pdf-template-engine';
+### Generate many PDFs (e.g. a certificate for every student)
 
-await generatePDF({
-  templatePath: './templates/multi-page.pdf',
-  outputPath: './output/filled.pdf',
-  fields: [
-    // Page 1 fields
-    { key: 'title', x: 50, y: 750, fontSize: 18, page: 1 },
-    { key: 'subtitle', x: 50, y: 720, fontSize: 12, page: 1 },
-    
-    // Page 2 fields
-    { key: 'footer', x: 50, y: 50, fontSize: 10, page: 2 }
-  ],
-  data: {
-    title: 'Document Title',
-    subtitle: 'Document Subtitle',
-    footer: 'Page 2 Footer'
-  }
-});
-```
+```ts
+import { readFile, writeFile } from 'fs/promises';
+import { fillPdf } from '@jyothiswarup/pdf-template-engine';
 
-### Error Handling
-
-```typescript
-import { generatePDF } from '@your-scope/pdf-template-engine';
-
-try {
-  await generatePDF({
-    templatePath: './templates/invoice.pdf',
-    outputPath: './output/invoice-filled.pdf',
-    fields: [
-      { key: 'customerName', x: 100, y: 700 }
-    ],
-    data: {
-      customerName: 'John Doe'
-    }
-  });
-  console.log('PDF generated successfully!');
-} catch (error) {
-  if (error instanceof Error) {
-    console.error('Error:', error.message);
-    // Possible errors:
-    // - "Template PDF not found: ..."
-    // - "Missing required field values: ..."
-    // - "Invalid x coordinate for field '...': ..."
-    // - "Page X does not exist in the PDF for field '...'"
-  }
+const template = await readFile('./certificate.pdf');
+for (const student of students) {
+  const pdf = await fillPdf(template, fields, student);
+  await writeFile(`./out/${student.certificateId}.pdf`, pdf);
 }
 ```
 
-## API Reference
+### An API route (Next.js App Router)
 
-### `generatePDF(options: GeneratePDFOptions): Promise<void>`
+```ts
+// app/api/certificate/route.ts
+import { fillPdf } from '@jyothiswarup/pdf-template-engine';
+import fields from './schema.json';
 
-Generates a PDF by filling text fields on a template PDF.
+export async function POST(req: Request) {
+  const data = await req.json();
+  const template = await fetch(new URL('/certificate.pdf', req.url)).then((r) => r.arrayBuffer());
+  const pdf = await fillPdf(template, fields, data);
+  return new Response(pdf as BodyInit, { headers: { 'Content-Type': 'application/pdf' } });
+}
+```
 
-#### Parameters
+## API
 
-- `templatePath` (string): Path to the template PDF file
-- `outputPath` (string): Path where the generated PDF will be saved
-- `fields` (PDFField[]): Array of field definitions
-- `data` (PDFData): Object mapping field keys to their values
+### `fillPdf(pdf, fields, data): Promise<Uint8Array>`
 
-#### Field Definition (`PDFField`)
+Fills a template in memory and returns the new PDF. It has no Node.js dependencies.
 
-- `key` (string): Unique identifier for the field (must match a key in `data`)
-- `x` (number): X coordinate in points (1 point = 1/72 inch)
-- `y` (number): Y coordinate in points (measured from bottom of page)
-- `fontSize` (number, optional): Font size in points (default: 12)
-- `page` (number, optional): Page number, 1-indexed (default: 1)
+| Param | Type | |
+|---|---|---|
+| `pdf` | `Uint8Array \| ArrayBuffer` (Node `Buffer` works) | The template PDF |
+| `fields` | `PDFField[]` | Where to put each value |
+| `data` | `Record<string, string \| number>` | Values keyed by field `key` |
 
-#### Data Object (`PDFData`)
+### `generatePDF(options): Promise<void>` (Node.js only)
 
-An object where keys match field `key` values and values are strings or numbers that will be rendered as text.
+Reads `templatePath`, fills it, and writes to `outputPath` (creating folders as needed).
 
-## Coordinate System
+| Option | Type |
+|---|---|
+| `templatePath` | `string` |
+| `outputPath` | `string` |
+| `fields` | `PDFField[]` |
+| `data` | `PDFData` |
 
-- Origin (0, 0) is at the **bottom-left** corner of the page
-- X increases to the right
-- Y increases upward
-- Units are in **points** (1 point = 1/72 inch)
+### `PDFField`
 
-To find coordinates, you can:
-1. Use a PDF editor to inspect element positions
-2. Use tools like `pdf-lib`'s measurement utilities
-3. Experiment with values and adjust
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `key` | `string` | required | Name of the value in `data` |
+| `x` | `number` | required | Left edge of the box, in points from the **left** of the page |
+| `y` | `number` | required | Top edge of the box, in points from the **top** of the page |
+| `width` | `number` | | Box width in points |
+| `height` | `number` | | Box height in points. If set, text is **vertically centered** in the box; otherwise its top aligns with `y` |
+| `fontSize` | `number` | `12` | Font size in points |
+| `page` | `number` | `1` | 1-indexed page number |
+
+## Coordinate system
+
+Coordinates are in **PDF points** (1 pt = 1/72 inch) with the origin at the **top-left** of the page as you see it in a viewer. That's the same convention as screen coordinates, and it's what `@jyothiswarup/pdf-template-builder` exports. The engine handles the PDF's bottom-left origin, crop box offsets and page rotation for you.
+
+| Page size | Width × height (pt) |
+|---|---|
+| A4 portrait | 595 × 842 |
+| A4 landscape | 842 × 595 |
+| US Letter | 612 × 792 |
+
+## Errors
+
+Both functions reject with a descriptive `Error` when:
+
+- a field's value is missing from `data`: `Missing required field values: studentName`
+- a coordinate, size or page number is invalid: `Invalid x coordinate for field 'name': -1`
+- the page doesn't exist: `Page 3 does not exist in the PDF for field 'name'`
+- the template can't be read or parsed: `Template PDF not found: …` or `Failed to load PDF template: …`
+
+## Current limitations
+
+Text is drawn in Helvetica, in black, and left-aligned on a single line. Custom fonts, colours, alignment, wrapping and images are on the roadmap. [Open an issue](https://github.com/jyothis-dev/pdf-npm-package/issues) to tell me which you need most.
 
 ## Development
 
 ```bash
-# Install dependencies
 npm install
-
-# Build the project
-npm run build
-
-# Type check
+npm run build      # dist/ (ESM + CJS + types)
 npm run typecheck
-
-# Watch mode for development
-npm run dev
 ```
-
-## Running the Backend Server (for Frontend Playground)
-
-To test the PDF template engine with the React playground frontend:
-
-1. **Install dependencies** (if not already done):
-   ```bash
-   npm install
-   ```
-
-2. **Start the backend server**:
-   ```bash
-   npm run server
-   ```
-   
-   Or for development with auto-reload:
-   ```bash
-   npm run server:dev
-   ```
-
-3. The server will start on `http://localhost:3000` with the following endpoints:
-   - `POST /pdf` - Generate PDF from template, schema, and data
-   - `GET /health` - Health check endpoint
-
-4. **Start the frontend** (in a separate terminal):
-   ```bash
-   cd ../frontend
-   npm install
-   npm run dev
-   ```
-
-5. The frontend will be available at `http://localhost:5173` (or the next available port)
-
-The backend server accepts:
-- **PDF file** (multipart/form-data)
-- **Schema** (JSON string of field definitions)
-- **Data** (JSON string of field values)
-
-And returns the generated PDF file.
 
 ## License
 
-MIT
-
+MIT © Jyothiswarup E V

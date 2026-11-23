@@ -1,0 +1,27 @@
+{
+  "name": "pdf-template-demo",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Live demo for @jyothiswarup/pdf-template-builder + @jyothiswarup/pdf-template-engine",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "make-sample": "node scripts/make-sample.mjs"
+  },
+  "dependencies": {
+    "@jyothiswarup/pdf-template-builder": "^0.3.0",
+    "@jyothiswarup/pdf-template-engine": "^1.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "pdf-lib": "^1.17.1",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}

@@ -1,7 +1,36 @@
 {
   "name": "@jyothiswarup/pdf-template-builder",
-  "version": "0.2.0",
-  "description": "React components for visually mapping PDF template fields",
+  "version": "0.3.0",
+  "description": "React drag-and-drop PDF field mapper: upload any PDF, place text fields visually, export a JSON schema to fill it with @jyothiswarup/pdf-template-engine.",
+  "keywords": [
+    "pdf",
+    "react",
+    "pdf-template",
+    "pdf-editor",
+    "pdf-builder",
+    "field-mapper",
+    "pdf-mapping",
+    "drag-and-drop",
+    "fill-pdf",
+    "pdf-filler",
+    "certificate-generator",
+    "invoice-generator",
+    "template-designer",
+    "pdfjs",
+    "react-component",
+    "typescript"
+  ],
+  "homepage": "https://jyothis-dev.github.io/pdf-npm-package/",
+  "bugs": {
+    "url": "https://github.com/jyothis-dev/pdf-npm-package/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jyothis-dev/pdf-npm-package.git",
+    "directory": "pdf-template-builder"
+  },
+  "license": "MIT",
+  "author": "Jyothiswarup E V",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -13,6 +42,9 @@
     },
     "./styles": "./dist/styles.css"
   },
+  "sideEffects": [
+    "*.css"
+  ],
   "files": [
     "dist",
     "README.md"
@@ -21,21 +53,6 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit"
-  },
-  "keywords": [
-    "pdf",
-    "template",
-    "react",
-    "pdf-mapping",
-    "pdf-builder",
-    "field-mapper"
-  ],
-  "author": "Jyothiswarup E V",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/jyothis-web/pdf-npm-package.git",
-    "directory": "pdf-template-builder"
   },
   "publishConfig": {
     "access": "public"
@@ -54,4 +71,3 @@
     "typescript": "^5.3.3"
   }
 }
-

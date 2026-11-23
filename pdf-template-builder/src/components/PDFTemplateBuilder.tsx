@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { PDFUploader } from './PDFUploader';
 import { PDFViewer } from './PDFViewer';
 import { FieldMapper } from './FieldMapper';
@@ -14,10 +14,12 @@ const DEFAULT_FIELD_WIDTH = 150;
 const DEFAULT_FIELD_HEIGHT = 20;
 
 export interface PDFTemplateBuilderProps {
-  /** PDF file to use as template */
+  /** PDF file to load as the template on mount (users can still upload another) */
   pdfFile?: File | null;
-  /** Initial schema (for editing existing templates) */
+  /** Initial schema (for editing existing templates), applied to the first PDF loaded */
   initialSchema?: SchemaField[];
+  /** Initial sample values keyed by field key, applied together with initialSchema */
+  initialData?: FieldData;
   /** Callback when schema changes */
   onSchemaChange?: (schema: SchemaField[]) => void;
   /** Callback when schema is exported */
@@ -39,6 +41,7 @@ export interface PDFTemplateBuilderProps {
 export function PDFTemplateBuilder({
   pdfFile: initialPdfFile,
   initialSchema,
+  initialData,
   onSchemaChange,
   onSchemaExport,
   onGenerate,
@@ -54,21 +57,38 @@ export function PDFTemplateBuilder({
   const [pdfFile, setPdfFile] = useState<File | null>(initialPdfFile || null);
   const [generating, setGenerating] = useState(false);
 
-  // Load initial schema (PDF points, 1-indexed pages) once the PDF pages are available
+  // initialSchema / initialData are applied once, to the first PDF that loads
+  const applyInitialRef = useRef(true);
+
+  // Load the PDF passed in via the `pdfFile` prop
   useEffect(() => {
-    if (!initialSchema || pages.length === 0) return;
-    setFields(
-      initialSchema.map((field, index) => ({
-        id: `field-${index}`,
-        key: field.key,
-        x: field.x,
-        y: field.y,
-        width: field.width ?? DEFAULT_FIELD_WIDTH,
-        height: field.height ?? DEFAULT_FIELD_HEIGHT,
-        page: (field.page ?? 1) - 1, // Convert to 0-indexed
-        fontSize: field.fontSize || 12,
-      }))
-    );
+    if (!initialPdfFile) return;
+    setPdfFile(initialPdfFile);
+    loadPDF(initialPdfFile);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPdfFile]);
+
+  // Apply initial schema (PDF points, 1-indexed pages) once the PDF pages are available
+  useEffect(() => {
+    if (!applyInitialRef.current || pages.length === 0) return;
+    applyInitialRef.current = false;
+    if (initialSchema) {
+      setFields(
+        initialSchema.map((field, index) => ({
+          id: `field-${index}`,
+          key: field.key,
+          x: field.x,
+          y: field.y,
+          width: field.width ?? DEFAULT_FIELD_WIDTH,
+          height: field.height ?? DEFAULT_FIELD_HEIGHT,
+          page: (field.page ?? 1) - 1, // Convert to 0-indexed
+          fontSize: field.fontSize || 12,
+        }))
+      );
+    }
+    if (initialData) {
+      setFieldData({ ...initialData });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pages]);
 
