@@ -1,6 +1,6 @@
 {
   "name": "@jyothiswarup/pdf-template-builder",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "React drag-and-drop PDF field mapper: upload any PDF, place text fields visually, export a JSON schema to fill it with @jyothiswarup/pdf-template-engine.",
   "keywords": [
     "pdf",

@@ -24,20 +24,62 @@ const pdfSize = (page: PDFPage) => ({
   h: page.pdfHeight ?? page.height / RENDER_SCALE,
 });
 
-/** CSS pixels per PDF point, measured separately per axis */
-type Scale = { x: number; y: number };
+/**
+ * Where the page is drawn inside its wrapper, in the wrapper's own (local,
+ * untransformed) CSS pixels: `ox`/`oy` is the top-left of the canvas content
+ * box, `sx`/`sy` are local pixels per PDF point. Field boxes are positioned
+ * with these values.
+ */
+type Geometry = { sx: number; sy: number; ox: number; oy: number };
 
 /**
- * How large the page canvas is actually drawn on screen, relative to the page
- * size in points. Each axis is measured separately, so it stays correct even
- * if the host app's CSS stretches the canvas to a different aspect ratio.
+ * Measures the page canvas in LOCAL layout pixels (offset/client sizes), which
+ * is the coordinate space absolutely-positioned field boxes live in. Unlike
+ * getBoundingClientRect this is not affected by CSS transforms or `zoom` on an
+ * ancestor, so the overlay stays aligned inside scaled containers, modals, etc.
+ * Host-app borders / padding on the canvas are accounted for too.
  */
-function measureScale(page: PDFPage): Scale | null {
+function measureGeometry(page: PDFPage): Geometry | null {
+  const canvas = page.canvas;
+  if (!canvas.isConnected) return null;
+  const cs = getComputedStyle(canvas);
+  const padL = parseFloat(cs.paddingLeft) || 0;
+  const padR = parseFloat(cs.paddingRight) || 0;
+  const padT = parseFloat(cs.paddingTop) || 0;
+  const padB = parseFloat(cs.paddingBottom) || 0;
+  const contentW = canvas.clientWidth - padL - padR;
+  const contentH = canvas.clientHeight - padT - padB;
+  if (contentW <= 0 || contentH <= 0) return null;
+  const { w, h } = pdfSize(page);
+  return {
+    sx: contentW / w,
+    sy: contentH / h,
+    ox: canvas.offsetLeft + canvas.clientLeft + padL,
+    oy: canvas.offsetTop + canvas.clientTop + padT,
+  };
+}
+
+/**
+ * Screen pixels (as reported by mouse events) per local CSS pixel. This is
+ * 1 normally, and differs when an ancestor is transformed / zoomed.
+ */
+function screenPerLocal(canvas: HTMLCanvasElement): { kx: number; ky: number } {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    kx: canvas.offsetWidth > 0 ? rect.width / canvas.offsetWidth : 1,
+    ky: canvas.offsetHeight > 0 ? rect.height / canvas.offsetHeight : 1,
+  };
+}
+
+/** Converts a mouse position to PDF points on the page (top-left origin). */
+function clientToPoints(page: PDFPage, geo: Geometry, clientX: number, clientY: number) {
   const canvas = page.canvas;
   const rect = canvas.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) return null;
-  const { w, h } = pdfSize(page);
-  return { x: rect.width / w, y: rect.height / h };
+  const { kx, ky } = screenPerLocal(canvas);
+  // local px from the canvas border-box edge -> from the content box -> points
+  const localX = (clientX - rect.left) / kx - (geo.ox - canvas.offsetLeft);
+  const localY = (clientY - rect.top) / ky - (geo.oy - canvas.offsetTop);
+  return { x: localX / geo.sx, y: localY / geo.sy };
 }
 
 /**
@@ -58,23 +100,22 @@ export function PDFViewer({
   fieldData,
 }: PDFViewerProps) {
   const containerRefs = useRef<Map<number, HTMLDivElement>>(new Map());
-  const [scales, setScales] = useState<Record<number, Scale>>({});
+  const [geometry, setGeometry] = useState<Record<number, Geometry>>({});
 
   // Mount canvases and keep the per-page display scale up to date
   useEffect(() => {
     const measure = () => {
-      const next: Record<number, Scale> = {};
+      const next: Record<number, Geometry> = {};
       pages.forEach((page) => {
-        const s = measureScale(page);
-        if (s) next[page.pageNumber] = s;
+        const g = measureGeometry(page);
+        if (g) next[page.pageNumber] = g;
       });
-      setScales((prev) => {
+      const eq = (a: Geometry, b: Geometry) =>
+        (['sx', 'sy', 'ox', 'oy'] as const).every((k) => Math.abs(a[k] - b[k]) < 1e-6);
+      setGeometry((prev) => {
         const same =
           Object.keys(next).length === Object.keys(prev).length &&
-          Object.entries(next).every(([k, v]) => {
-            const p = prev[Number(k)];
-            return p && Math.abs(p.x - v.x) < 1e-6 && Math.abs(p.y - v.y) < 1e-6;
-          });
+          Object.entries(next).every(([k, v]) => prev[Number(k)] && eq(prev[Number(k)], v));
         return same ? prev : next;
       });
     };
@@ -96,7 +137,8 @@ export function PDFViewer({
     };
   }, [pages]);
 
-  const getScale = (page: PDFPage): Scale => scales[page.pageNumber] || { x: 1, y: 1 };
+  const getGeometry = (page: PDFPage): Geometry =>
+    geometry[page.pageNumber] || measureGeometry(page) || { sx: 1, sy: 1, ox: 0, oy: 0 };
 
   const startInteraction = (
     e: ReactMouseEvent,
@@ -108,16 +150,17 @@ export function PDFViewer({
     e.stopPropagation();
     onFieldSelect(field.id);
 
-    const scale = getScale(page);
+    const geo = getGeometry(page);
+    const { kx, ky } = screenPerLocal(page.canvas);
     const { w: pageW, h: pageH } = pdfSize(page);
     const startX = e.clientX;
     const startY = e.clientY;
     const start = { x: field.x, y: field.y, width: field.width, height: field.height };
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      // Mouse movement in CSS pixels -> points
-      const dx = (moveEvent.clientX - startX) / scale.x;
-      const dy = (moveEvent.clientY - startY) / scale.y;
+      // Mouse movement in screen pixels -> local CSS pixels -> points
+      const dx = (moveEvent.clientX - startX) / kx / geo.sx;
+      const dy = (moveEvent.clientY - startY) / ky / geo.sy;
 
       if (!corner) {
         onFieldUpdate(field.id, {
@@ -159,7 +202,7 @@ export function PDFViewer({
     <div className="pdf-viewer">
       {pages.map((page) => {
         const pageFields = fields.filter((f) => f.page === page.pageNumber);
-        const scale = getScale(page);
+        const geo = getGeometry(page);
 
         return (
           <div key={page.pageNumber} className="pdf-page-container">
@@ -178,11 +221,12 @@ export function PDFViewer({
               onClick={(e) => {
                 const target = e.target as HTMLElement;
                 if (!onFieldAdd || target.closest('.field-box')) return;
-                // Measure against the canvas itself so the origin is the page's top-left corner
-                const rect = page.canvas.getBoundingClientRect();
-                const s = measureScale(page);
-                if (!s) return;
-                onFieldAdd(page.pageNumber, (e.clientX - rect.left) / s.x, (e.clientY - rect.top) / s.y);
+                const geo = measureGeometry(page);
+                if (!geo) return;
+                const pt = clientToPoints(page, geo, e.clientX, e.clientY);
+                const { w, h } = pdfSize(page);
+                if (pt.x < 0 || pt.y < 0 || pt.x > w || pt.y > h) return; // outside the page
+                onFieldAdd(page.pageNumber, pt.x, pt.y);
               }}
             >
               {pageFields.map((field) => {
@@ -194,10 +238,10 @@ export function PDFViewer({
                     className={`field-box ${selectedFieldId === field.id ? 'selected' : ''}`}
                     style={{
                       position: 'absolute',
-                      left: `${field.x * scale.x}px`,
-                      top: `${field.y * scale.y}px`,
-                      width: `${field.width * scale.x}px`,
-                      height: `${field.height * scale.y}px`,
+                      left: `${geo.ox + field.x * geo.sx}px`,
+                      top: `${geo.oy + field.y * geo.sy}px`,
+                      width: `${field.width * geo.sx}px`,
+                      height: `${field.height * geo.sy}px`,
                       boxSizing: 'border-box',
                       cursor: 'move',
                       pointerEvents: 'auto',
@@ -219,7 +263,7 @@ export function PDFViewer({
                           display: 'flex',
                           alignItems: 'center',
                           fontFamily: 'Helvetica, Arial, sans-serif',
-                          fontSize: `${fontSize * scale.y}px`,
+                          fontSize: `${fontSize * geo.sy}px`,
                           lineHeight: 1,
                           whiteSpace: 'nowrap',
                           overflow: 'visible',
