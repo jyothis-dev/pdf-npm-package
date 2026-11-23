@@ -1,22 +1,15 @@
 import { promises as fs } from 'fs';
-import { PDFDocument } from 'pdf-lib';
 import path from 'path';
+import { PDFDocument } from 'pdf-lib';
 
 /**
- * Saves the PDF document to the specified output path
- * @param pdfDoc The PDF document to save
- * @param outputPath Path where the PDF will be saved
+ * Saves a PDF document to disk, creating the output directory if needed
  */
 export async function savePdf(pdfDoc: PDFDocument, outputPath: string): Promise<void> {
   try {
-    // Ensure the output directory exists
     const outputDir = path.dirname(outputPath);
     await fs.mkdir(outputDir, { recursive: true });
-
-    // Serialize the PDF to bytes
     const pdfBytes = await pdfDoc.save();
-
-    // Write to file system
     await fs.writeFile(outputPath, pdfBytes);
   } catch (error) {
     if (error instanceof Error) {
@@ -25,4 +18,3 @@ export async function savePdf(pdfDoc: PDFDocument, outputPath: string): Promise<
     throw new Error('Failed to save PDF: Unknown error');
   }
 }
-

@@ -1,8 +1,8 @@
-import { loadPdf } from './core/loadPdf';
-import { drawText } from './core/drawText';
-import { savePdf } from './core/savePdf';
-import { validateInput } from './core/validateInput';
-import { GeneratePDFOptions } from './types';
+import { loadPdf } from './core/loadPdf.js';
+import { drawText } from './core/drawText.js';
+import { savePdf } from './core/savePdf.js';
+import { validateInput } from './core/validateInput.js';
+import { GeneratePDFOptions } from './types.js';
 
 /**
  * Generates a PDF by filling text fields on a template PDF
@@ -42,12 +42,12 @@ export async function generatePDF(options: GeneratePDFOptions): Promise<void> {
   const pdfDoc = await loadPdf(templatePath);
 
   // Draw text fields on the PDF
-  drawText(pdfDoc, fields, data);
+  await drawText(pdfDoc, fields, data);
 
   // Save the modified PDF
   await savePdf(pdfDoc, outputPath);
 }
 
 // Export types for consumers
-export type { PDFField, PDFData, GeneratePDFOptions } from './types';
+export type { PDFField, PDFData, GeneratePDFOptions } from './types.js';
 

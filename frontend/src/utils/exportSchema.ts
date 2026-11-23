@@ -24,9 +24,35 @@ export function exportSchema(
   // This is more accurate than using a fixed scale factor
 
   return fields.map((field) => {
-    const page = pages.find((p) => p.pageNumber === field.page);
+    // Ensure field.page is a number (handle case where it might be an object)
+    let fieldPageNumber: number;
+    if (typeof field.page === 'number') {
+      fieldPageNumber = field.page;
+    } else if (typeof field.page === 'object' && field.page !== null && 'pageNumber' in field.page) {
+      fieldPageNumber = (field.page as any).pageNumber;
+    } else {
+      // Handle non-serializable values (like DOM elements)
+      let pageValueStr: string;
+      if (field.page === null) {
+        pageValueStr = 'null';
+      } else if (typeof field.page === 'object') {
+        try {
+          const obj = field.page as any;
+          pageValueStr = obj.constructor?.name ? `[object ${obj.constructor.name}]` : '[object Object]';
+        } catch {
+          pageValueStr = '[object Object]';
+        }
+      } else {
+        pageValueStr = String(field.page);
+      }
+      console.error('Invalid field.page value:', field.page, 'for field:', field.key, 'Type:', typeof field.page);
+      throw new Error(`Invalid page number for field "${field.key}": ${pageValueStr}. Expected a number, got ${typeof field.page}`);
+    }
+    
+    const page = pages.find((p) => p.pageNumber === fieldPageNumber);
     if (!page) {
-      throw new Error(`Page ${field.page} not found`);
+      console.error('Available pages:', pages.map(p => p.pageNumber), 'Looking for:', fieldPageNumber);
+      throw new Error(`Page ${fieldPageNumber} not found for field "${field.key}". Available pages: ${pages.map(p => p.pageNumber).join(', ')}`);
     }
 
     // Calculate conversion factor based on actual PDF dimensions
@@ -78,7 +104,7 @@ export function exportSchema(
       x: Math.round(xPoints),
       y: Math.round(yPoints),
       fontSize: field.fontSize || 12,
-      page: field.page + 1, // Convert to 1-indexed
+      page: fieldPageNumber + 1, // Convert to 1-indexed
     };
   });
 }

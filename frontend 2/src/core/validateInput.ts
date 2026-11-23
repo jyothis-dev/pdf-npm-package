@@ -1,5 +1,5 @@
 import { promises as fs } from 'fs';
-import { PDFField, PDFData } from '../types';
+import { PDFField, PDFData } from '../types.js';
 
 /**
  * Validates that the template PDF file exists
@@ -46,6 +46,13 @@ export function validateFieldCoordinates(fields: PDFField[]): void {
 
     if (field.page !== undefined && (typeof field.page !== 'number' || field.page < 1)) {
       throw new Error(`Invalid page number for field '${field.key}': ${field.page}`);
+    }
+
+    for (const dim of ['width', 'height'] as const) {
+      const v = field[dim];
+      if (v !== undefined && (typeof v !== 'number' || v < 0)) {
+        throw new Error(`Invalid ${dim} for field '${field.key}': ${v}`);
+      }
     }
 
     if (field.fontSize !== undefined && (typeof field.fontSize !== 'number' || field.fontSize <= 0)) {

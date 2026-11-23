@@ -39,12 +39,14 @@ export function Toolbar({
 
     const schema = exportSchema(fields, pages);
     
-    // Prepare data - only include fields that have sample data
+    // Prepare data - include ALL fields from schema (required by backend)
+    // Fields without sample data will be empty strings
     const data: FieldData = {};
     fields.forEach((field) => {
-      if (fieldData[field.key] !== undefined && fieldData[field.key] !== '') {
-        data[field.key] = fieldData[field.key];
-      }
+      // Include field even if no sample data - backend requires all schema fields to have data
+      data[field.key] = fieldData[field.key] !== undefined && fieldData[field.key] !== '' 
+        ? fieldData[field.key] 
+        : '';
     });
 
     try {

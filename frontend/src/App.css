@@ -51,7 +51,7 @@
   flex: 1;
   overflow-y: auto;
   padding: 2rem;
-  background: #fafafa;
+  background: #e3f2fd; /* Light blue background */
 }
 
 .empty-state {
@@ -103,13 +103,20 @@
   display: flex;
   flex-direction: column;
   gap: 2rem;
+  align-items: center;
+  width: 100%;
 }
 
 .pdf-page-container {
   background: white;
-  padding: 1.5rem;
+  padding: 2rem;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 auto;
+  max-width: fit-content;
 }
 
 .page-label {
@@ -123,11 +130,18 @@
   display: inline-block;
   position: relative;
   cursor: crosshair;
+  background: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  overflow: hidden;
 }
 
 .canvas-wrapper canvas {
   pointer-events: auto;
   cursor: crosshair;
+  display: block; /* Remove any inline spacing */
+  max-width: 100%;
+  height: auto;
 }
 
 .field-box {

@@ -19,9 +19,9 @@ export function PDFViewer({
   selectedFieldId,
   onFieldSelect,
   onFieldUpdate,
-  onFieldDelete,
+  onFieldDelete: _onFieldDelete,
   onFieldAdd,
-  getCanvasRef,
+  getCanvasRef: _getCanvasRef,
 }: PDFViewerProps) {
   const containerRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
@@ -143,11 +143,20 @@ export function PDFViewer({
                   // Attach canvas if not already attached
                   if (page.canvas && !el.contains(page.canvas)) {
                     el.appendChild(page.canvas);
+                    // Ensure canvas displays at natural size
+                    page.canvas.style.width = 'auto';
+                    page.canvas.style.height = 'auto';
+                    page.canvas.style.maxWidth = '100%';
                   }
                 }
               }}
               className="canvas-wrapper"
-              style={{ position: 'relative', display: 'inline-block' }}
+              style={{ 
+                position: 'relative', 
+                display: 'inline-block',
+                width: 'fit-content',
+                height: 'fit-content'
+              }}
               onClick={(e) => {
                 // Allow adding fields by clicking on canvas (if onFieldAdd is provided)
                 // Check if click is on canvas or wrapper (not on a field)

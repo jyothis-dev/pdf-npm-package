@@ -2,9 +2,7 @@ import { promises as fs } from 'fs';
 import { PDFDocument } from 'pdf-lib';
 
 /**
- * Loads a PDF file from the file system
- * @param templatePath Path to the PDF template file
- * @returns Promise resolving to a PDFDocument instance
+ * Loads a PDF template from disk
  */
 export async function loadPdf(templatePath: string): Promise<PDFDocument> {
   try {
@@ -17,4 +15,3 @@ export async function loadPdf(templatePath: string): Promise<PDFDocument> {
     throw new Error('Failed to load PDF template: Unknown error');
   }
 }
-
