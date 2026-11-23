@@ -24,6 +24,22 @@ const pdfSize = (page: PDFPage) => ({
   h: page.pdfHeight ?? page.height / RENDER_SCALE,
 });
 
+/** CSS pixels per PDF point, measured separately per axis */
+type Scale = { x: number; y: number };
+
+/**
+ * How large the page canvas is actually drawn on screen, relative to the page
+ * size in points. Each axis is measured separately, so it stays correct even
+ * if the host app's CSS stretches the canvas to a different aspect ratio.
+ */
+function measureScale(page: PDFPage): Scale | null {
+  const canvas = page.canvas;
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return null;
+  const { w, h } = pdfSize(page);
+  return { x: rect.width / w, y: rect.height / h };
+}
+
 /**
  * Renders the PDF pages with draggable / resizable field boxes on top.
  *
@@ -42,20 +58,23 @@ export function PDFViewer({
   fieldData,
 }: PDFViewerProps) {
   const containerRefs = useRef<Map<number, HTMLDivElement>>(new Map());
-  const [scales, setScales] = useState<Record<number, number>>({});
+  const [scales, setScales] = useState<Record<number, Scale>>({});
 
   // Mount canvases and keep the per-page display scale up to date
   useEffect(() => {
     const measure = () => {
-      const next: Record<number, number> = {};
+      const next: Record<number, Scale> = {};
       pages.forEach((page) => {
-        const rect = page.canvas.getBoundingClientRect();
-        if (rect.width > 0) next[page.pageNumber] = rect.width / pdfSize(page).w;
+        const s = measureScale(page);
+        if (s) next[page.pageNumber] = s;
       });
       setScales((prev) => {
         const same =
           Object.keys(next).length === Object.keys(prev).length &&
-          Object.entries(next).every(([k, v]) => Math.abs((prev as any)[k] - v) < 1e-6);
+          Object.entries(next).every(([k, v]) => {
+            const p = prev[Number(k)];
+            return p && Math.abs(p.x - v.x) < 1e-6 && Math.abs(p.y - v.y) < 1e-6;
+          });
         return same ? prev : next;
       });
     };
@@ -77,7 +96,7 @@ export function PDFViewer({
     };
   }, [pages]);
 
-  const getScale = (page: PDFPage) => scales[page.pageNumber] || 1;
+  const getScale = (page: PDFPage): Scale => scales[page.pageNumber] || { x: 1, y: 1 };
 
   const startInteraction = (
     e: ReactMouseEvent,
@@ -97,8 +116,8 @@ export function PDFViewer({
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       // Mouse movement in CSS pixels -> points
-      const dx = (moveEvent.clientX - startX) / scale;
-      const dy = (moveEvent.clientY - startY) / scale;
+      const dx = (moveEvent.clientX - startX) / scale.x;
+      const dy = (moveEvent.clientY - startY) / scale.y;
 
       if (!corner) {
         onFieldUpdate(field.id, {
@@ -161,8 +180,9 @@ export function PDFViewer({
                 if (!onFieldAdd || target.closest('.field-box')) return;
                 // Measure against the canvas itself so the origin is the page's top-left corner
                 const rect = page.canvas.getBoundingClientRect();
-                const s = rect.width / pdfSize(page).w;
-                onFieldAdd(page.pageNumber, (e.clientX - rect.left) / s, (e.clientY - rect.top) / s);
+                const s = measureScale(page);
+                if (!s) return;
+                onFieldAdd(page.pageNumber, (e.clientX - rect.left) / s.x, (e.clientY - rect.top) / s.y);
               }}
             >
               {pageFields.map((field) => {
@@ -174,10 +194,10 @@ export function PDFViewer({
                     className={`field-box ${selectedFieldId === field.id ? 'selected' : ''}`}
                     style={{
                       position: 'absolute',
-                      left: `${field.x * scale}px`,
-                      top: `${field.y * scale}px`,
-                      width: `${field.width * scale}px`,
-                      height: `${field.height * scale}px`,
+                      left: `${field.x * scale.x}px`,
+                      top: `${field.y * scale.y}px`,
+                      width: `${field.width * scale.x}px`,
+                      height: `${field.height * scale.y}px`,
                       boxSizing: 'border-box',
                       cursor: 'move',
                       pointerEvents: 'auto',
@@ -199,7 +219,7 @@ export function PDFViewer({
                           display: 'flex',
                           alignItems: 'center',
                           fontFamily: 'Helvetica, Arial, sans-serif',
-                          fontSize: `${fontSize * scale}px`,
+                          fontSize: `${fontSize * scale.y}px`,
                           lineHeight: 1,
                           whiteSpace: 'nowrap',
                           overflow: 'visible',
